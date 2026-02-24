@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Chat Tester</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap");
+
+    :root {
+      --bg: #0f1412;
+      --panel: #161d19;
+      --panel-2: #1c2520;
+      --text: #e9f3ec;
+      --muted: #a7b8ad;
+      --accent: #6bd48b;
+      --accent-2: #2f8f57;
+      --danger: #ff6b6b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Noto Sans SC", system-ui, sans-serif;
+      background: #0f1412;
+      color: var(--text);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: radial-gradient(1200px 800px at 10% 0%, #1c2620 0%, #0f1412 60%),
+        radial-gradient(1200px 800px at 90% 100%, #0e1a14 0%, #0f1412 60%);
+      pointer-events: none;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr 260px;
+      height: 100vh;
+      min-height: 100vh;
+      height: 100dvh;
+      min-height: 100dvh;
+      width: 100vw;
+    }
+
+    .topbar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #1f2a23;
+      background: #0f1412;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .topbar .btn {
+      margin: 0;
+      width: auto;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    aside {
+      background: linear-gradient(180deg, #141b17 0%, #121915 100%);
+      border-right: 1px solid #1f2a23;
+      padding: 24px 20px;
+    }
+
+    .drawer {
+      background: linear-gradient(180deg, #141b17 0%, #121915 100%);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 86vw;
+      max-width: 360px;
+      z-index: 20;
+      overflow-y: auto;
+      transform: translateX(-105%);
+      transition: transform 0.2s ease;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .drawer.right {
+      right: 0;
+      left: auto;
+      transform: translateX(105%);
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 14, 12, 0.6);
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .history {
+      border-left: 1px solid #1f2a23;
+      border-right: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 12px;
+      padding: 20px;
+      background: linear-gradient(180deg, #121916 0%, #0f1412 100%);
+      min-height: 0;
+    }
+
+    .history h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #cfe7d6;
+      letter-spacing: 0.3px;
+    }
+
+    .history .new {
+      margin: 0;
+      width: 100%;
+    }
+
+    .session-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .session-item {
+      border: 1px solid #25332a;
+      background: #141c18;
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, transform 0.08s ease;
+    }
+
+    .session-item:hover {
+      border-color: #365044;
+    }
+
+    .session-item.active {
+      border-color: #6bd48b;
+      background: #16221d;
+    }
+
+    .session-title {
+      font-size: 13px;
+      color: #e4f1ea;
+      margin-bottom: 4px;
+    }
+
+    .session-meta {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .brand {
+      font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      letter-spacing: 0.3px;
+      font-weight: 700;
+      font-size: 20px;
+      margin-bottom: 18px;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 14px 0 6px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #25332a;
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      margin-top: 16px;
+      width: 100%;
+      border: 0;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #0d1411;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.08s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .danger {
+      background: transparent;
+      border: 1px solid #2b3a31;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    main {
+      display: grid;
+      grid-template-rows: 1fr auto auto;
+      background: linear-gradient(180deg, rgba(22, 29, 25, 0.6), rgba(15, 20, 18, 0.9));
+      min-height: 0;
+    }
+
+    .chat {
+      padding: 24px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .bubble {
+      max-width: 760px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      margin-bottom: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .me {
+      background: #1c2b23;
+      margin-left: auto;
+      border: 1px solid #2d3d33;
+    }
+
+    .bot {
+      background: #18201c;
+      border: 1px solid #26312a;
+    }
+
+    .system {
+      background: #1d1f2a;
+      border: 1px dashed #3a4254;
+      color: #cfd6ff;
+    }
+
+    .composer {
+      padding: 18px 24px 24px;
+      border-top: 1px solid #1f2a23;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+      background: #111713;
+    }
+
+    .composer textarea {
+      min-height: 56px;
+      max-height: 180px;
+    }
+
+    .send {
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: 0;
+      background: #6bd48b;
+      font-weight: 700;
+      cursor: pointer;
+      color: #0b1410;
+    }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .footer {
+      padding: 10px 24px 14px;
+      border-top: 1px solid #1f2a23;
+      font-size: 12px;
+      color: var(--muted);
+      background: #0f1412;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer strong {
+      color: #cfe7d6;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100dvh;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid #1f2a23;
+      }
+
+      .history {
+        border-left: 0;
+        border-top: 1px solid #1f2a23;
+        grid-template-rows: auto auto auto;
+      }
+
+      main {
+        min-height: 60vh;
+      }
+    }
+
+    @media (max-height: 760px) {
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      main {
+        min-height: 60vh;
+      }
+
+      body {
+        font-size: 13px;
+      }
+
+      aside {
+        padding: 16px 14px;
+      }
+
+      .history {
+        padding: 14px;
+      }
+
+      .chat {
+        padding: 16px;
+      }
+
+      .composer {
+        padding: 12px 16px 16px;
+      }
+
+      .composer textarea {
+        min-height: 44px;
+        max-height: 140px;
+      }
+
+      .footer {
+        padding: 8px 16px 10px;
+      }
+
+      label {
+        margin: 10px 0 6px;
+      }
+    }
+
+    @media (max-width: 1200px),
+    (max-height: 700px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      aside.history,
+      aside.config {
+        display: none;
+      }
+
+      .topbar {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="backdrop" id="backdrop"></div>
+  <div class="app">
+    <aside class="config">
+      <div class="brand">LLM Chat Tester</div>
+      <div class="hint">面向 OpenAI 兼容接口的简洁聊天面板。你可以替换模型、端点和 Token，适配不同的大模型服务。</div>
+
+      <label>Endpoint 预设</label>
+      <select id="endpointPreset">
+        <option value="https://dashscope.aliyuncs.com/compatible-mode/v1">DashScope 北京（兼容模式）</option>
+        <option value="https://dashscope-intl.aliyuncs.com/compatible-mode/v1">DashScope 新加坡（兼容模式）</option>
+        <option value="https://coding.dashscope.aliyuncs.com/v1">DashScope Coding 北京</option>
+        <option value="custom">自定义...</option>
+      </select>
+
+      <label>Base URL</label>
+      <input id="baseUrl" value="https://dashscope.aliyuncs.com/compatible-mode/v1" />
+
+      <label>Model</label>
+      <select id="modelPreset">
+        <option value="qwen3.5-plus">qwen3.5-plus</option>
+        <option value="qwen-max">qwen-max</option>
+        <option value="qwen-plus">qwen-plus</option>
+        <option value="qwen-turbo">qwen-turbo</option>
+        <option value="custom">自定义...</option>
+      </select>
+      <input id="modelCustom" placeholder="自定义模型名称" />
+      <div class="hint">提示：不同 Endpoint 支持的模型不一样，coding 端点可能不支持 qwen-max。</div>
+
+      <label>API Token</label>
+      <input id="token" type="password" placeholder="sk-..." />
+
+      <div class="row">
+        <div>
+          <label>Temperature</label>
+          <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7" />
+        </div>
+        <div>
+          <label>Max Tokens</label>
+          <input id="maxTokens" type="number" min="1" step="1" value="1024" />
+        </div>
+      </div>
+
+      <label>System Prompt (可选)</label>
+      <textarea id="systemPrompt" placeholder="给模型一个角色或约束"></textarea>
+
+      <button class="btn" id="save">保存配置</button>
+      <button class="btn" id="test">测试连接</button>
+      <button class="btn danger" id="debug">调试配置</button>
+      <button class="btn danger" id="clear">清空对话</button>
+      <div class="status" id="status">未连接</div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <button class="btn" id="openConfig">配置</button>
+        <button class="btn" id="openHistory">历史</button>
+        <div class="status" id="statusTop">未连接</div>
+      </div>
+      <div class="chat" id="chat"></div>
+      <div class="composer">
+        <textarea id="input" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+        <button class="send" id="send">发送</button>
+      </div>
+      <div class="footer">
+        <div><strong>LLM Chat Tester</strong> · 仅供本地测试 · OpenAI 兼容接口</div>
+        <div>© 2026 akria · 私有使用</div>
+      </div>
+    </main>
+
+    <aside class="history">
+      <h3>对话历史（30天）</h3>
+      <button class="btn new" id="newChat">新开对话</button>
+      <ul class="session-list" id="sessionList"></ul>
+    </aside>
+  </div>
+
+  <aside class="drawer config" id="configDrawer">
+    <div class="brand">LLM Chat Tester</div>
+    <div class="hint">面向 OpenAI 兼容接口的简洁聊天面板。你可以替换模型、端点和 Token，适配不同的大模型服务。</div>
+
+    <label>Endpoint 预设</label>
+    <select id="endpointPresetDrawer"></select>
+
+    <label>Base URL</label>
+    <input id="baseUrlDrawer" />
+
+    <label>Model</label>
+    <select id="modelPresetDrawer"></select>
+    <input id="modelCustomDrawer" placeholder="自定义模型名称" />
+    <div class="hint">提示：不同 Endpoint 支持的模型不一样，coding 端点可能不支持 qwen-max。</div>
+
+    <label>API Token</label>
+    <input id="tokenDrawer" type="password" placeholder="sk-..." />
+
+    <div class="row">
+      <div>
+        <label>Temperature</label>
+        <input id="temperatureDrawer" type="number" min="0" max="2" step="0.1" />
+      </div>
+      <div>
+        <label>Max Tokens</label>
+        <input id="maxTokensDrawer" type="number" min="1" step="1" />
+      </div>
+    </div>
+
+    <label>System Prompt (可选)</label>
+    <textarea id="systemPromptDrawer" placeholder="给模型一个角色或约束"></textarea>
+
+    <button class="btn" id="saveDrawer">保存配置</button>
+    <button class="btn" id="testDrawer">测试连接</button>
+    <button class="btn danger" id="debugDrawer">调试配置</button>
+    <button class="btn danger" id="clearDrawer">清空对话</button>
+    <div class="status" id="statusDrawer">未连接</div>
+  </aside>
+
+  <aside class="drawer right history" id="historyDrawer">
+    <h3>对话历史（30天）</h3>
+    <button class="btn new" id="newChatDrawer">新开对话</button>
+    <ul class="session-list" id="sessionListDrawer"></ul>
+  </aside>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const chat = el("chat");
+    const statusEl = el("status");
+    const sessionListEl = el("sessionList");
+
+    const state = {
+      messages: [],
+      sessions: [],
+      currentSessionId: "",
+      config: {
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: "qwen3.5-plus",
+        token: "",
+        temperature: 0.7,
+        maxTokens: 1024,
+        systemPrompt: ""
+      }
+    };
+
+    let saveTimer = null;
+    async function saveConfig() {
+      const endpointPreset = el("endpointPreset").value;
+      if (endpointPreset && endpointPreset !== "custom") {
+        el("baseUrl").value = endpointPreset;
+      }
+      state.config.baseUrl = el("baseUrl").value.trim();
+      const presetVal = el("modelPreset").value;
+      const customVal = el("modelCustom").value.trim();
+      state.config.model = presetVal === "custom" ? customVal : presetVal;
+      state.config.token = el("token").value.trim();
+      state.config.temperature = Number(el("temperature").value || 0.7);
+      state.config.maxTokens = Number(el("maxTokens").value || 1024);
+      state.config.systemPrompt = el("systemPrompt").value.trim();
+      try {
+        await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state.config)
+        });
+        statusEl.textContent = "配置已保存到本地";
+      } catch (_) {
+        statusEl.textContent = "配置保存失败";
+      }
+    }
+
+    function scheduleSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveConfig, 400);
+    }
+
+    async function loadConfig() {
+      try {
+        const res = await fetch("/api/config");
+        if (res.ok) {
+          const config = await res.json();
+          state.config = { ...state.config, ...config };
+        }
+      } catch (_) { }
+      const endpointEl = el("endpointPreset");
+      const isEndpointPreset = Array.from(endpointEl.options).some((o) => o.value === state.config.baseUrl);
+      endpointEl.value = isEndpointPreset ? state.config.baseUrl : "custom";
+      el("baseUrl").value = state.config.baseUrl || "";
+      const presetEl = el("modelPreset");
+      const isPreset = Array.from(presetEl.options).some((o) => o.value === state.config.model);
+      presetEl.value = isPreset ? state.config.model : "custom";
+      el("modelCustom").value = isPreset ? "" : (state.config.model || "");
+      el("token").value = state.config.token || "";
+      el("temperature").value = state.config.temperature ?? 0.7;
+      el("maxTokens").value = state.config.maxTokens ?? 1024;
+      el("systemPrompt").value = state.config.systemPrompt || "";
+    }
+
+    async function loadMessages() {
+      if (!state.currentSessionId) return;
+      try {
+        const res = await fetch(`/api/sessions/${state.currentSessionId}/messages`);
+        if (res.ok) {
+          const messages = await res.json();
+          if (Array.isArray(messages)) state.messages = messages;
+        }
+      } catch (_) { }
+    }
+
+    async function fetchSessionsList() {
+      try {
+        const res = await fetch("/api/sessions");
+        if (res.ok) {
+          const sessions = await res.json();
+          return Array.isArray(sessions) ? sessions : [];
+        }
+      } catch (_) { }
+      return [];
+    }
+
+    async function loadSessions() {
+      state.sessions = await fetchSessionsList();
+      if (!state.sessions.length) {
+        await createSession();
+      } else {
+        state.currentSessionId = state.sessions[0].id;
+      }
+      renderSessions();
+      await loadMessages();
+    }
+
+    async function refreshSessionsKeepCurrent() {
+      const currentId = state.currentSessionId;
+      state.sessions = await fetchSessionsList();
+      if (currentId && state.sessions.some((s) => s.id === currentId)) {
+        state.currentSessionId = currentId;
+      }
+      renderSessions();
+    }
+
+    async function createSession() {
+      try {
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "新对话" })
+        });
+        if (res.ok) {
+          const session = await res.json();
+          state.sessions.unshift(session);
+          state.currentSessionId = session.id;
+          state.messages = [];
+          renderSessions();
+          render();
+        }
+      } catch (_) { }
+    }
+
+    async function setSession(id) {
+      state.currentSessionId = id;
+      await loadMessages();
+      renderSessions();
+      render();
+    }
+
+    async function saveSessionMessages() {
+      if (!state.currentSessionId) return;
+      try {
+        await fetch(`/api/sessions/${state.currentSessionId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state.messages)
+        });
+      } catch (_) { }
+    }
+
+    async function updateSessionTitle(title) {
+      if (!state.currentSessionId) return;
+      try {
+        const res = await fetch(`/api/sessions/${state.currentSessionId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title })
+        });
+        if (res.ok) {
+          const next = await res.json();
+          const idx = state.sessions.findIndex((s) => s.id === next.id);
+          if (idx !== -1) state.sessions[idx] = next;
+          renderSessions();
+        }
+      } catch (_) { }
+    }
+
+    function renderSessions() {
+      if (!sessionListEl) return;
+      sessionListEl.innerHTML = "";
+      state.sessions.forEach((s) => {
+        const li = document.createElement("li");
+        li.className = `session-item ${s.id === state.currentSessionId ? "active" : ""}`;
+        li.innerHTML = `<div class="session-title">${s.title || "未命名对话"}</div><div class="session-meta">${new Date(s.updatedAt || s.createdAt).toLocaleString()}</div>`;
+        li.addEventListener("click", () => setSession(s.id));
+        sessionListEl.appendChild(li);
+      });
+    }
+
+    function render() {
+      chat.innerHTML = "";
+      if (state.config.systemPrompt) {
+        addBubble("system", state.config.systemPrompt);
+      }
+      state.messages.forEach((m) => addBubble(m.role, m.content));
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addBubble(role, text) {
+      const div = document.createElement("div");
+      div.className = `bubble ${role === "user" ? "me" : role === "assistant" ? "bot" : "system"}`;
+      div.textContent = text;
+      chat.appendChild(div);
+    }
+
+    async function sendMessage() {
+      const content = el("input").value.trim();
+      if (!content) return;
+      if (!state.currentSessionId) {
+        statusEl.textContent = "请先新建一个对话";
+        return;
+      }
+      if (!state.config.token) {
+        statusEl.textContent = "请先填写 API Token";
+        return;
+      }
+
+      state.messages.push({ role: "user", content });
+      const currentSession = state.sessions.find((s) => s.id === state.currentSessionId);
+      if (currentSession && (currentSession.title === "新对话" || !currentSession.title)) {
+        const title = content.slice(0, 18);
+        if (title) await updateSessionTitle(title);
+      }
+      el("input").value = "";
+      render();
+
+      statusEl.textContent = "请求中...";
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            config: state.config,
+            messages: state.messages,
+            systemPrompt: state.config.systemPrompt
+          })
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          statusEl.textContent = `请求失败 (${res.status})`;
+          state.messages.push({ role: "assistant", content: `Error: ${errText}` });
+          render();
+        } else {
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content ?? "(空回复)";
+          state.messages.push({ role: "assistant", content: reply });
+          statusEl.textContent = "已收到响应";
+          render();
+        }
+      } catch (err) {
+        statusEl.textContent = "请求异常";
+        state.messages.push({ role: "assistant", content: `Error: ${String(err)}` });
+        render();
+      }
+
+      await saveSessionMessages();
+      await refreshSessionsKeepCurrent();
+    }
+
+    async function testConnection() {
+      statusEl.textContent = "测试中...";
+      try {
+        const res = await fetch("/api/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config: state.config })
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          statusEl.textContent = `测试失败 (${res.status})`;
+          state.messages.push({ role: "assistant", content: `Test Error: ${errText}` });
+          render();
+          return;
+        }
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content ?? "(空回复)";
+        state.messages.push({ role: "assistant", content: `Test OK: ${reply}` });
+        statusEl.textContent = "测试成功";
+        render();
+      } catch (err) {
+        statusEl.textContent = "测试异常";
+        state.messages.push({ role: "assistant", content: `Test Error: ${String(err)}` });
+        render();
+      }
+    }
+
+    async function debugConfig() {
+      statusEl.textContent = "调试中...";
+      try {
+        const res = await fetch("/api/debug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config: state.config })
+        });
+        const data = await res.json();
+        state.messages.push({
+          role: "assistant",
+          content: `Debug: baseUrl=${data.baseUrl}, model=${data.model}, tokenMasked=${data.tokenMasked}, tokenLength=${data.tokenLength}, tokenSource=${data.tokenSource}`
+        });
+        statusEl.textContent = "调试完成";
+        render();
+      } catch (err) {
+        statusEl.textContent = "调试异常";
+        state.messages.push({ role: "assistant", content: `Debug Error: ${String(err)}` });
+        render();
+      }
+    }
+
+    el("save").addEventListener("click", saveConfig);
+    el("test").addEventListener("click", testConnection);
+    el("debug").addEventListener("click", debugConfig);
+    ["endpointPreset", "baseUrl", "modelPreset", "modelCustom", "token", "temperature", "maxTokens", "systemPrompt"].forEach((id) => {
+      const node = el(id);
+      node.addEventListener("input", scheduleSave);
+      node.addEventListener("change", scheduleSave);
+    });
+    el("endpointPreset").addEventListener("change", () => {
+      if (el("endpointPreset").value === "custom") return;
+      el("baseUrl").value = el("endpointPreset").value;
+      scheduleSave();
+    });
+    el("modelPreset").addEventListener("change", () => {
+      if (el("modelPreset").value === "custom") {
+        el("modelCustom").focus();
+      }
+    });
+    el("clear").addEventListener("click", async () => {
+      state.messages = [];
+      render();
+      statusEl.textContent = "已清空";
+      await saveSessionMessages();
+    });
+    el("newChat").addEventListener("click", async () => {
+      await createSession();
+    });
+    el("send").addEventListener("click", sendMessage);
+    el("input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    (async () => {
+      await loadConfig();
+      await loadSessions();
+      render();
+    })();
+  </script>
+</body>
+
+</html>
